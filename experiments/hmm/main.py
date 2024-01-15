@@ -10,6 +10,8 @@ from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.loggers import TensorBoardLogger
 from typing import List
 
+import pickle as pkl
+
 from tint.attr import (
     DynaMask,
     ExtremalMask,
@@ -37,7 +39,7 @@ from tint.metrics.white_box import (
 from tint.models import MLP, RNN
 
 
-from experiments.hmm.classifier import StateClassifierNet
+from classifier import StateClassifierNet
 
 
 def main(
@@ -66,6 +68,8 @@ def main(
     # Load data
     hmm = HMM(n_folds=5, fold=fold, seed=seed)
 
+    print(f"Training classifier..")
+
     # Create classifier
     classifier = StateClassifierNet(
         feature_size=3,
@@ -83,12 +87,16 @@ def main(
         accelerator=accelerator,
         devices=device_id,
         deterministic=deterministic,
+        enable_checkpointing=True,
         logger=TensorBoardLogger(
             save_dir=".",
-            version=random.getrandbits(128),
+            name="HMM_classifier",
+            # version=random.getrandbits(128),
         ),
     )
     trainer.fit(classifier, datamodule=hmm)
+
+    print(f"Training classifier finished.")
 
     # Get data for explainers
     with lock:
@@ -96,6 +104,11 @@ def main(
         x_test = hmm.preprocess(split="test")["x"].to(device)
         y_test = hmm.preprocess(split="test")["y"].to(device)
         true_saliency = hmm.true_saliency(split="test").to(device)
+
+    # Save classifier predictions for debug plotting
+    y_hat_test = classifier.forward(x_test, return_all=True).argmax(dim=-1)
+    with open(hmm.data_dir + "/classifier_predictions_test.npz", "wb") as fp:
+        pkl.dump(obj=y_hat_test, file=fp)
 
     # Switch to eval
     classifier.eval()
@@ -154,16 +167,20 @@ def main(
         print(f"Best keep ratio is {_attr[1]}")
         attr["dyna_mask"] = _attr[0].to(device)
 
+    extremal_mask_max_epochs = 500  # single epoch definitino for both the preservation and deletion game
     if "extremal_mask" in explainers:
+        print(f"Training extremal_mask (preservation)..")
         trainer = Trainer(
-            max_epochs=500,
+            max_epochs=extremal_mask_max_epochs,
             accelerator=accelerator,
             devices=device_id,
             log_every_n_steps=2,
             deterministic=deterministic,
+            enable_checkpointing=True,
             logger=TensorBoardLogger(
                 save_dir=".",
-                version=random.getrandbits(128),
+                name="HMM_extremal_mask_explainer",
+                # version=random.getrandbits(128),
             ),
         )
         mask = ExtremalMaskNet(
@@ -191,6 +208,48 @@ def main(
             batch_size=100,
         )
         attr["extremal_mask"] = _attr.to(device)
+
+    if "extremal_mask_deletion" in explainers:
+        print(f"Training extremal_mask (deletion)..")
+        trainer = Trainer(
+            max_epochs=extremal_mask_max_epochs,
+            accelerator=accelerator,
+            devices=device_id,
+            log_every_n_steps=2,
+            deterministic=deterministic,
+            enable_checkpointing=True,
+            logger=TensorBoardLogger(
+                save_dir=".",
+                name="HMM_extremal_mask_explainer_deletion",
+                # version=random.getrandbits(128),
+            ),
+        )
+        mask = ExtremalMaskNet(
+            forward_func=classifier,
+            model=nn.Sequential(
+                RNN(
+                    input_size=x_test.shape[-1],
+                    rnn="gru",
+                    hidden_size=x_test.shape[-1],
+                    bidirectional=True,
+                ),
+                MLP([2 * x_test.shape[-1], x_test.shape[-1]]),
+            ),
+            lambda_1=lambda_1,
+            lambda_2=lambda_2,
+            optim="adam",
+            lr=0.01,
+            preservation_mode=False
+        )
+        explainer = ExtremalMask(classifier)
+        _attr = explainer.attribute(
+            x_test,
+            additional_forward_args=(True,),
+            trainer=trainer,
+            mask_net=mask,
+            batch_size=100,
+        )
+        attr["extremal_mask_deletion"] = _attr.to(device)
 
     if "fit" in explainers:
         generator = JointFeatureGeneratorNet(rnn_hidden_size=6)
@@ -295,6 +354,10 @@ def main(
         attr["retain"] = (
             explainer.attribute(x_test, target=y_test).abs().to(device)
         )
+
+    # Save all explanation for debug plotting
+    with open(hmm.data_dir + "/explanations.npz", "wb") as fp:
+        pkl.dump(obj=attr, file=fp)
 
     with open(output_file, "a") as fp, lock:
         for k, v in attr.items():
