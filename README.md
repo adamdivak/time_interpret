@@ -14,6 +14,7 @@
 - Providing a folder with the results and a notebook that displays these results.
 - Providing additional options to easily run the revised deletion game.
 - Adding code that saves files that are used for certain tables/figures.
+- Adding a [jupyter notebook](results/main.ipynb) that shows all the results we obtained
 
 ## Getting started
 
