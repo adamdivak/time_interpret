@@ -1,5 +1,6 @@
 import multiprocessing as mp
 import numpy as np
+import os
 import random
 import torch as th
 import torch.nn as nn
@@ -76,18 +77,25 @@ def main(
         l2=1e-3,
     )
 
-    # Train classifier
-    trainer = Trainer(
-        max_epochs=100,
-        accelerator=accelerator,
-        devices=device_id,
-        deterministic=deterministic,
-        logger=TensorBoardLogger(
-            save_dir=".",
-            version=random.getrandbits(128),
-        ),
-    )
-    trainer.fit(classifier, datamodule=weather)
+    if args.classifier_checkpoint and not os.path.exists(args.classifier_checkpoint):
+        print(f"Classifier checkpoint specified, but does not exist, re-training the classifier.")
+        args.classifier_checkpoint = ""
+    if args.classifier_checkpoint:
+        classifier = MimicClassifierNet.load_from_checkpoint(args.classifier_checkpoint)
+        print(f"..pre-trained classifier loaded from {args.classifier_checkpoint}")
+    else:
+        # Train classifier
+        trainer = Trainer(
+            max_epochs=100,
+            accelerator=accelerator,
+            devices=device_id,
+            deterministic=deterministic,
+            logger=TensorBoardLogger(
+                save_dir=".",
+                version=random.getrandbits(128),
+            ),
+        )
+        trainer.fit(classifier, datamodule=weather)
 
     # Get data for explainers
     with lock:
@@ -188,7 +196,46 @@ def main(
             mask_net=mask,
             batch_size=100,
         )
-        attr["extremal_mask"] = _attr.to(device)
+        attr["extremal_mask_preservation"] = _attr.to(device)
+
+    if "extremal_mask_deletion" in explainers:
+        trainer = Trainer(
+            max_epochs=500,
+            accelerator=accelerator,
+            devices=device_id,
+            log_every_n_steps=2,
+            deterministic=deterministic,
+            logger=TensorBoardLogger(
+                save_dir=".",
+                version=random.getrandbits(128),
+            ),
+        )
+        mask = ExtremalMaskNet(
+            forward_func=classifier,
+            model=nn.Sequential(
+                RNN(
+                    input_size=x_test.shape[-1],
+                    rnn="gru",
+                    hidden_size=x_test.shape[-1],
+                    bidirectional=True,
+                ),
+                MLP([2 * x_test.shape[-1], x_test.shape[-1]]),
+            ),
+            lambda_1=lambda_1,
+            lambda_2=lambda_2,
+            loss="cross_entropy",
+            optim="adam",
+            lr=0.01,
+            preservation_mode=False
+        )
+        explainer = ExtremalMask(classifier)
+        _attr = explainer.attribute(
+            x_test,
+            trainer=trainer,
+            mask_net=mask,
+            batch_size=100,
+        )
+        attr["extremal_mask_deletion"] = _attr.to(device)
 
     if "fit" in explainers:
         generator = JointFeatureGeneratorNet(rnn_hidden_size=6)
@@ -384,7 +431,8 @@ def parse_args():
         default=[
             "deep_lift",
             "dyna_mask",
-            "extremal_mask",
+            "extremal_mask_preservation",
+            "extremal_mask_deletion",
             "fit",
             "gradient_shap",
             "integrated_gradients",
@@ -452,6 +500,12 @@ def parse_args():
         type=str,
         default="results_weather.csv",
         help="Where to save the results.",
+    )
+    parser.add_argument(
+        "--classifier_checkpoint",
+        type=str,
+        default="HMM_classifier/version_47/checkpoints/epoch=49-step=1000.ckpt",
+        help="A checkpoint to load the classifier from instead of re-training.",
     )
     return parser.parse_args()
 
