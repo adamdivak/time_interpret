@@ -231,7 +231,10 @@ class ExtremalMaskNet(Net):
                 * batch_idx : self.net.batch_size
                 * (batch_idx + 1)
             ]
-            mask_ += self.lambda_2 * self.net.model(x - baselines).abs()
+            if self.preservation_mode:
+                mask_ += self.lambda_2 * self.net.model(x - baselines).abs()
+            else:
+                mask_ += self.lambda_2 * (self.net.model(x) - x)**2
         loss = mask_.mean()
 
         # Add preservation and deletion losses if required
