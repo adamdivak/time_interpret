@@ -12,6 +12,7 @@
 - Fixing an issue in the implementation of the deletion game ([commit](https://github.com/yosuah/time_interpret_private/commit/a9b77f1fdc82e4157a059da5d3959f34ffb48818)).
 - Adjusting the loss function for the deletion game ([commit](https://github.com/yosuah/time_interpret_private/commit/9693264fccf0a99ea1732fcd070b9dbc8e166955)).
 - Providing code for experiments on a weather dataset ([commit](https://github.com/yosuah/time_interpret_private/commit/e806bb78dd2c5337e58de80b4d6a58caf40cc3ed)).
+- Fix HMM data caching issue, causing incorrect results in the paper ([commit](https://github.com/yosuah/time_interpret_private/commit/cfe87ad91bc186dc8c12ccfc0395d2fbd424e9dc)).
 - Providing additional options to run the revised deletion game easily.
 - Adding code that saves files used for certain tables/figures.
 
