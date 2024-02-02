@@ -160,7 +160,7 @@ def main(
         print(f"Best keep ratio is {_attr[1]}")
         attr["dyna_mask"] = _attr[0].to(device)
 
-    if "extremal_mask" in explainers:
+    if "extremal_mask_preservation" in explainers:
         trainer = Trainer(
             max_epochs=500,
             accelerator=accelerator,
@@ -223,7 +223,7 @@ def main(
             ),
             lambda_1=lambda_1,
             lambda_2=lambda_2,
-            loss="cross_entropy",
+            # loss="cross_entropy",
             optim="adam",
             lr=0.01,
             preservation_mode=False
@@ -235,7 +235,7 @@ def main(
             mask_net=mask,
             batch_size=100,
         )
-        attr["extremal_mask_deletion"] = _attr.to(device)
+        attr["extremal_mask_deletion"] = 1 - _attr.to(device)  # the returned mask by deletion is flipped
 
     if "fit" in explainers:
         generator = JointFeatureGeneratorNet(rnn_hidden_size=6)

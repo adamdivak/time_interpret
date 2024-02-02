@@ -239,7 +239,7 @@ def main(
             mask_net=mask,
             batch_size=100,
         )
-        attr["extremal_mask_deletion"] = _attr.to(device)
+        attr["extremal_mask_deletion"] = 1 - _attr.to(device)  # the returned mask by deletion is flipped
         perturbed_signals["extremal_mask_deletion"] = mask.net.perturbed_singal
 
     if "fit" in explainers:
