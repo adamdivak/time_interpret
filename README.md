@@ -1,17 +1,19 @@
 # On the reproducibility of: "Learning Perturbation to Explain Time Series Predictions"
 ### Authors: Wouter Bant, Ádám Divák, Jasper Eppink, and Floris Six Dijkstra
- We used the provided code to run all experiments. See the commits to see the changes we made. 
+
+<p align="center">
+  <img src="assets/explained_saliency.svg">
+</p>
+
+ We used the provided code of [Joseph Enguehard](https://github.com/josephenguehard/time_interpret) to run all experiments. 
  
- These changes can be summarized as:
+ Some additions/changes we made:
 - Fixing an issue in the implementation of the deletion game.
 - Adjusting the loss function for the deletion game.
 - Providing code for experiments on an weather dataset.
 - Providing a folder with the results and a notebook that displays these results.
 - Providing additional options to easily run the revised deletion game.
 - Adding code that saves files that are used for certain tables/figures.
-
-## Acknowledgment
-- [Joseph Enguehard](https://github.com/josephenguehard/time_interpret) for almost all the code.
 
 ## Getting started
 
@@ -60,3 +62,5 @@ If you don't want to run all explanation methods you can add a flag such as:
 --explainers extremal_mask_preservation extremal_mask_deletion dyna_mask deep_lift
 ```
 
+## Acknowledgment
+- [Joseph Enguehard](https://github.com/josephenguehard/time_interpret) for almost all the code.

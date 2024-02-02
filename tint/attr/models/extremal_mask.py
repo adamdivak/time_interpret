@@ -77,9 +77,9 @@ class ExtremalMaskNN(nn.Module):
         # x2 represents inputs with unimportant features masked.
         mask = mask[:, : x.shape[1], ...]
         x1 = x * mask + baselines * (1.0 - mask)
-        x2 = x * (1.0 - mask) + baselines * mask
+        # x2 = x * (1.0 - mask) + baselines * mask NOTE: this was in the original code, however, this is inconsistent with the paper
 
-        # Return f(perturbed x)
+        # Return f(perturbed x)  NOTE: returning a tuple here is not necessary anymore as we only use x1
         return (
             _run_forward(
                 forward_func=self.forward_func,
