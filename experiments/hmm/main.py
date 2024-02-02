@@ -3,6 +3,7 @@ import numpy as np
 import random
 import torch as th
 import torch.nn as nn
+import os
 
 from argparse import ArgumentParser
 from captum.attr import DeepLift, GradientShap, IntegratedGradients, Lime
@@ -81,22 +82,30 @@ def main(
         l2=1e-3,
     )
 
-    # Train classifier
-    trainer = Trainer(
-        max_epochs=50,
-        accelerator=accelerator,
-        devices=device_id,
-        deterministic=deterministic,
-        enable_checkpointing=True,
-        logger=TensorBoardLogger(
-            save_dir=".",
-            name="HMM_classifier",
-            # version=random.getrandbits(128),
-        ),
-    )
-    trainer.fit(classifier, datamodule=hmm)
+    if args.classifier_checkpoint and not os.path.exists(args.classifier_checkpoint):
+        print(f"Classifier checkpoint specified, but does not exist, re-training the classifier.")
+        args.classifier_checkpoint = ""
+    if args.classifier_checkpoint:
+        classifier = StateClassifierNet.load_from_checkpoint(args.classifier_checkpoint)
+        print(f"..pre-trained classifier loaded from {args.classifier_checkpoint}")
+    else:
+        # Train classifier
+        trainer = Trainer(
+            max_epochs=50,
+            accelerator=accelerator,
+            devices=device_id,
+            deterministic=deterministic,
+            enable_checkpointing=True,
+            check_val_every_n_epoch=10,
+            default_root_dir="HMM_classifier",
+            logger=TensorBoardLogger(
+                save_dir=".",
+                name="HMM_classifier",
+            ),
+        )
+        trainer.fit(classifier, datamodule=hmm)
 
-    print(f"Training classifier finished.")
+        print(f"..training classifier finished.")
 
     # Get data for explainers
     with lock:
@@ -123,7 +132,8 @@ def main(
         th.backends.cudnn.enabled = False
 
     # Create dict of attributions
-    attr = dict()
+    attr = {}
+    perturbed_signals = {}
 
     if "deep_lift" in explainers:
         explainer = TimeForwardTunnel(DeepLift(classifier))
@@ -135,6 +145,7 @@ def main(
         ).abs()
 
     if "dyna_mask" in explainers:
+        print(f"Training dynamask..")
         trainer = Trainer(
             max_epochs=1000,
             accelerator=accelerator,
@@ -143,7 +154,7 @@ def main(
             deterministic=deterministic,
             logger=TensorBoardLogger(
                 save_dir=".",
-                version=random.getrandbits(128),
+                name="dyna_mask",
             ),
         )
         mask = MaskNet(
@@ -167,16 +178,17 @@ def main(
         print(f"Best keep ratio is {_attr[1]}")
         attr["dyna_mask"] = _attr[0].to(device)
 
-    extremal_mask_max_epochs = 500  # single epoch definitino for both the preservation and deletion game
-    if "extremal_mask" in explainers:
+    if "extremal_mask_preservation" in explainers:
         print(f"Training extremal_mask (preservation)..")
         trainer = Trainer(
-            max_epochs=extremal_mask_max_epochs,
+            max_epochs=500,
             accelerator=accelerator,
             devices=device_id,
             log_every_n_steps=2,
+            check_val_every_n_epoch=20,
             deterministic=deterministic,
             enable_checkpointing=True,
+            default_root_dir="extremal_mask_preservation",
             logger=TensorBoardLogger(
                 save_dir=".",
                 name="HMM_extremal_mask_explainer",
@@ -207,15 +219,17 @@ def main(
             mask_net=mask,
             batch_size=100,
         )
-        attr["extremal_mask"] = _attr.to(device)
+        attr["extremal_mask_preservation"] = _attr.to(device)
+        perturbed_signals["extremal_mask_preservation"] = mask.net.perturbed_singal
 
     if "extremal_mask_deletion" in explainers:
         print(f"Training extremal_mask (deletion)..")
         trainer = Trainer(
-            max_epochs=extremal_mask_max_epochs,
+            max_epochs=500,
             accelerator=accelerator,
             devices=device_id,
             log_every_n_steps=2,
+            check_val_every_n_epoch=20,
             deterministic=deterministic,
             enable_checkpointing=True,
             logger=TensorBoardLogger(
@@ -250,27 +264,32 @@ def main(
             batch_size=100,
         )
         attr["extremal_mask_deletion"] = _attr.to(device)
+        perturbed_signals["extremal_mask_deletion"] = mask.net.perturbed_singal
 
     if "fit" in explainers:
-        generator = JointFeatureGeneratorNet(rnn_hidden_size=6)
-        trainer = Trainer(
-            max_epochs=300,
-            accelerator=accelerator,
-            devices=device_id,
-            log_every_n_steps=10,
-            deterministic=deterministic,
-            logger=TensorBoardLogger(
-                save_dir=".",
-                version=random.getrandbits(128),
-            ),
-        )
-        explainer = Fit(
-            classifier,
-            generator=generator,
-            datamodule=hmm,
-            trainer=trainer,
-        )
-        attr["fit"] = explainer.attribute(x_test, show_progress=True)
+        try:
+            generator = JointFeatureGeneratorNet(rnn_hidden_size=6)
+            trainer = Trainer(
+                max_epochs=300,
+                accelerator=accelerator,
+                devices=device_id,
+                log_every_n_steps=10,
+                deterministic=deterministic,
+                logger=TensorBoardLogger(
+                    save_dir=".",
+                    version=random.getrandbits(128),
+                ),
+            )
+            explainer = Fit(
+                classifier,
+                generator=generator,
+                datamodule=hmm,
+                trainer=trainer,
+            )
+            attr["fit"] = explainer.attribute(x_test, show_progress=True)
+        except Exception as e:
+            # In some cases thi explainer failed to run properly
+            print(f"Failed to run the Fit explainer, excluding it")
 
     if "gradient_shap" in explainers:
         explainer = TimeForwardTunnel(GradientShap(classifier.cpu()))
@@ -356,8 +375,12 @@ def main(
         )
 
     # Save all explanation for debug plotting
-    with open(hmm.data_dir + "/explanations.npz", "wb") as fp:
-        pkl.dump(obj=attr, file=fp)
+    with open(hmm.data_dir + "/hmm_saliency.npz", "wb") as fp:
+        attr_numpy = {k: v.detach().numpy() for k, v in attr.items()}
+        pkl.dump(attr_numpy, fp)
+    with open(hmm.data_dir + "/hmm_x_test_perturbed_signals.npz", "wb") as fp:
+        perturbed_signals_numpy = {k: v.detach().numpy() for k, v in perturbed_signals.items()}
+        pkl.dump(obj=perturbed_signals_numpy, file=fp)
 
     with open(output_file, "a") as fp, lock:
         for k, v in attr.items():
@@ -383,7 +406,8 @@ def parse_args():
         default=[
             "deep_lift",
             "dyna_mask",
-            "extremal_mask",
+            "extremal_mask_preservation",
+            "extremal_mask_deletion",
             "fit",
             "gradient_shap",
             "integrated_gradients",
@@ -436,6 +460,12 @@ def parse_args():
         type=str,
         default="results.csv",
         help="Where to save the results.",
+    )
+    parser.add_argument(
+        "--classifier_checkpoint",
+        type=str,
+        default="HMM_classifier/version_47/checkpoints/epoch=49-step=1000.ckpt",
+        help="A checkpoint to load the classifier from instead of re-training.",
     )
     return parser.parse_args()
 
