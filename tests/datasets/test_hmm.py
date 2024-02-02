@@ -108,8 +108,10 @@ def test_hmm(
         fold=fold,
         num_workers=num_workers,
         seed=seed,
+        test_size=10,
+        signal_length=20
     )
-    hmm.download(split="test", test_size=10, signal_length=20)
+    hmm.download(split="test")
     x_test = hmm.preprocess(split="test")["x"]
     y_test = hmm.preprocess(split="test")["y"]
     assert tuple(x_test.shape) == (10, 20, 3)

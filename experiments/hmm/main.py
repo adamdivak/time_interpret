@@ -68,6 +68,7 @@ def main(
 
     # Load data
     hmm = HMM(n_folds=5, fold=fold, seed=seed)
+    hmm.prepare_data()
 
     print(f"Training classifier..")
 
