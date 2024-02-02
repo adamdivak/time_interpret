@@ -89,7 +89,7 @@ class ExtremalMaskNN(nn.Module):
             ),
             _run_forward(
                 forward_func=self.forward_func,
-                inputs=x2,
+                inputs=x1,
                 target=target,
                 additional_forward_args=additional_forward_args,
             ),
