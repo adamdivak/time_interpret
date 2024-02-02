@@ -21,3 +21,8 @@ lightning_logs
 
 # Latex
 out
+
+# Checkpoints, Tensorboard and PytorchLightning logs
+*.ckpt
+events.out.tfevents.*
+hparams.yaml
