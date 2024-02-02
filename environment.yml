@@ -8,7 +8,7 @@ channels:
 dependencies:
   - python==3.9.7
   - cudatoolkit==11.6
-  - captum
+  # - captum  # captum was not picked up from a conda package, so it is installed with pip
   - datasets
   - git
   - jupyter
@@ -19,6 +19,8 @@ dependencies:
   - scikit-image
   - scikit-learn
   - scipy
+  - seaborn
+  - pytest
   - pytorch
   - pytorch-lightning
   - torchmetrics
@@ -26,4 +28,7 @@ dependencies:
   - transformers
   - pip:
       - black
+      - captum
       - flake8
+      - prettytable
+      - tensorboard
