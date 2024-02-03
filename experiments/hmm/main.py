@@ -134,7 +134,7 @@ def main(
 
     # Create dict of attributions
     attr = {}
-    perturbed_signals = {}
+    # perturbed_signals = {}
 
     if "deep_lift" in explainers:
         explainer = TimeForwardTunnel(DeepLift(classifier))
@@ -221,7 +221,7 @@ def main(
             batch_size=100,
         )
         attr["extremal_mask_preservation"] = _attr.to(device)
-        perturbed_signals["extremal_mask_preservation"] = mask.net.perturbed_singal
+        # perturbed_signals["extremal_mask_preservation"] = mask.net.perturbed_signal
 
     if "extremal_mask_deletion" in explainers:
         print(f"Training extremal_mask (deletion)..")
@@ -265,7 +265,7 @@ def main(
             batch_size=100,
         )
         attr["extremal_mask_deletion"] = 1 - _attr.to(device)  # the returned mask by deletion is flipped
-        perturbed_signals["extremal_mask_deletion"] = mask.net.perturbed_singal
+        # perturbed_signals["extremal_mask_deletion"] = mask.net.perturbed_signal
 
     if "fit" in explainers:
         try:
@@ -379,9 +379,9 @@ def main(
     with open(hmm.data_dir + "/hmm_saliency.npz", "wb") as fp:
         attr_numpy = {k: v.detach().numpy() for k, v in attr.items()}
         pkl.dump(attr_numpy, fp)
-    with open(hmm.data_dir + "/hmm_x_test_perturbed_signals.npz", "wb") as fp:
-        perturbed_signals_numpy = {k: v.detach().numpy() for k, v in perturbed_signals.items()}
-        pkl.dump(obj=perturbed_signals_numpy, file=fp)
+    # with open(hmm.data_dir + "/hmm_x_test_perturbed_signals.npz", "wb") as fp:
+    #     perturbed_signals_numpy = {k: v.detach().numpy() for k, v in perturbed_signals.items()}
+    #     pkl.dump(obj=perturbed_signals_numpy, file=fp)
 
     with open(output_file, "a") as fp, lock:
         for k, v in attr.items():
