@@ -140,7 +140,7 @@ class HMM(DataModule):
         return os.path.join(
             self.data_dir,
             (f"{split}_{self.train_size}_{self.test_size}_{self.signal_length}_{self.n_signal}_" +
-             f"{self.train}_{self.seed}_")
+             f"None_{self.seed}_")
         )
 
     def download(
