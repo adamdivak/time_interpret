@@ -1,5 +1,6 @@
 # On the reproducibility of: "Learning Perturbation to Explain Time Series Predictions"
 ### Authors: Wouter Bant, Ádám Divák, Jasper Eppink, and Floris Six Dijkstra
+Paper and reviews: [https://openreview.net/forum?id=nPZgtpfgIx](https://openreview.net/forum?id=nPZgtpfgIx)
 
 <p align="center">
   <img src="assets/explained_saliency.svg">
@@ -21,11 +22,11 @@
 ### Installing the dependencies
 Clone the repository:
 ```
-git pull https://github.com/yosuah/time_interpret_private.git
+git pull https://github.com/yosuah/time_interpret.git
 ```
 Go inside the root directory:
 ```
-cd time_interpret_private
+cd time_interpret
 ```
 Create the conda environment
 ```
