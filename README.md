@@ -2,6 +2,8 @@
 ### Authors: Wouter Bant, Ádám Divák, Jasper Eppink, and Floris Six Dijkstra
 Paper and reviews: [https://openreview.net/forum?id=nPZgtpfgIx](https://openreview.net/forum?id=nPZgtpfgIx)
 
+*Deep Learning models have taken the front stage in the AI community, yet explainability challenges hinder their widespread adoption. Time series models, in particular, lack attention in this regard. This study tries to reproduce and extend the work of Enguehard (2023b), focusing on time series explainability by incorporating learnable masks and perturbations. Enguehard (2023b) employed two methods to learn these masks and perturbations, the preservation game (yielding SOTA results) and the deletion game (with poor performance). We extend the work by revising the deletion game’s loss function, testing the robustness of the proposed method on a novel weather dataset, and visualizing the learned masks and perturbations. Despite notable discrepancies in results across many experiments, our findings demonstrate that the proposed method consistently outperforms all baselines and exhibits robust performance across datasets. However, visualizations for the preservation game reveal that the learned perturbations primarily resemble a constant zero signal, questioning the importance of learning perturbations. Nevertheless, our revised deletion game shows promise, recovering meaningful perturbations and, in certain instances, surpassing the performance of the preservation game.*
+
 <p align="center">
   <img src="assets/explained_saliency.svg">
 </p>
